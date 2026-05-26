@@ -1,0 +1,15 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Env
+.env
+
+# Vector DB / runtime data
+vectordb/
+data/
+*.db
+
+# OS
+.DS_Store

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RAG AI Assistant</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --base:    #08080f;
+    --surface: #0f0f1a;
+    --panel:   #13131f;
+    --border:  #2a2a40;
+    --accent:  #6366f1;
+    --accent2: #4f46e5;
+    --text:    #ffffff;
+    --sub:     #a0aec0;
+    --ok:      #4ade80;
+    --err:     #f87171;
+  }
+
+  body.light {
+    --base:    #f1f5f9;
+    --surface: #e2e8f0;
+    --panel:   #ffffff;
+    --border:  #cbd5e1;
+    --accent:  #6366f1;
+    --accent2: #4f46e5;
+    --text:    #0f172a;
+    --sub:     #475569;
+    --ok:      #16a34a;
+    --err:     #dc2626;
+  }
+
+  /* Toggle button */
+  .theme-toggle {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 14px;
+    cursor: pointer; font-size: 13px; color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif; font-weight: 500;
+    transition: all .2s; white-space: nowrap;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  html, body, #root { height: 100%; background: var(--base); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 16px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: #2d2d4e; border-radius: 4px; }
+
+  /* Layout */
+  .app       { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar   { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--panel); border-right: 1px solid var(--border); }
+  .main      { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--base); }
+
+  /* Sidebar sections */
+  .logo      { padding: 22px 24px; border-bottom: 1px solid var(--border); }
+  .logo span { font-family: 'IBM Plex Mono', monospace; font-size: 1.4rem; }
+  .logo .hi  { color: var(--accent); }
+  .logo .lo  { color: var(--sub); }
+
+  .doc-status { padding: 16px 24px; border-bottom: 1px solid var(--border); }
+  .label      { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; font-weight: 600; }
+  .dot        { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+
+  .scroll-area { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .bottom-bar  { padding: 14px 24px; border-top: 1px solid var(--border); }
+
+  /* Tabs */
+  .tabs { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .tab  { flex: 1; padding: 8px 4px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; text-align: center; cursor: pointer; background: none; border: none; color: #94a3b8; transition: background .15s, color .15s; }
+  .tab.active { background: var(--accent); color: #fff; }
+  .tab:hover:not(.active) { background: var(--surface); color: #fff; }
+
+  /* Drop zone */
+  .dropzone { height: 120px; border: 2px dashed var(--border); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: border-color .2s, background .2s; gap: 8px; }
+  .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(99,102,241,0.07); }
+  .dropzone svg { width: 32px; height: 32px; color: #64748b; }
+  .dropzone p  { font-size: 14px; color: #94a3b8; }
+  .dropzone a  { color: var(--accent); }
+
+  /* URL input */
+  .url-input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 14px; color: #fff; outline: none; transition: border-color .2s; }
+  .url-input:focus { border-color: var(--accent); }
+  .url-input::placeholder { color: #64748b; }
+
+  /* Buttons */
+  .btn-primary { width: 100%; padding: 11px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-size: 15px; font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; cursor: pointer; transition: background .15s; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-primary:disabled { opacity: .4; cursor: default; }
+  .btn-ghost  { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: none; color: #94a3b8; font-size: 15px; cursor: pointer; transition: border-color .15s, color .15s; }
+  .btn-ghost:hover { border-color: #475569; color: #fff; }
+
+  /* Status */
+  .status-ok  { font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--ok);  background: rgba(74,222,128,.12); padding: 10px 14px; border-radius: 8px; }
+  .status-err { font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--err); background: rgba(248,113,113,.12); padding: 10px 14px; border-radius: 8px; }
+
+  /* Voice */
+  .voice-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 14px; border-radius: 8px; border: 1px solid var(--border); background: none; color: #94a3b8; font-size: 14px; cursor: pointer; transition: all .15s; }
+  .voice-btn:hover { border-color: #475569; color: #fff; }
+  .voice-btn.listening { border-color: var(--err); color: var(--err); background: rgba(248,113,113,.08); animation: pulse 1.5s ease-in-out infinite; }
+  .voice-transcript { font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: #94a3b8; padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+  /* Chat header */
+  .chat-header { padding: 18px 32px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .chat-header h1 { font-size: 18px; font-weight: 600; color: var(--text); }
+  .chat-header p  { font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--sub); margin-top: 3px; }
+
+  /* Messages */
+  .messages { flex: 1; overflow-y: auto; padding: 28px 32px; display: flex; flex-direction: column; gap: 22px; }
+  .empty    { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; opacity: .4; }
+  .empty svg { width: 52px; height: 52px; color: #334155; }
+  .empty p   { font-size: 14px; font-family: 'IBM Plex Mono', monospace; color: #64748b; }
+
+  /* Bubbles */
+  .row       { display: flex; gap: 12px; animation: fadeUp .25s ease forwards; }
+  .row.user  { flex-direction: row-reverse; }
+  .avatar    { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-family: 'IBM Plex Mono', monospace; flex-shrink: 0; font-weight: 600; }
+  .avatar.u  { background: var(--accent); color: #fff; }
+  .avatar.a  { background: var(--surface); border: 1px solid var(--border); color: #94a3b8; }
+  .bubble    { max-width: 70%; padding: 13px 18px; border-radius: 18px; font-size: 15px; line-height: 1.65; }
+  .bubble.u  { background: var(--accent); color: #fff; border-top-right-radius: 4px; }
+  .bubble.a  { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-top-left-radius: 4px; }
+
+  /* Cursor blink */
+  .cursor { display: inline-block; width: 2px; height: 1em; background: var(--accent); margin-left: 3px; vertical-align: text-bottom; animation: blink .8s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Input bar */
+  .input-bar  { padding: 18px 32px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .input-wrap { display: flex; align-items: flex-end; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; transition: border-color .2s; }
+  .input-wrap:focus-within { border-color: #4f46e5; }
+  .input-wrap textarea { flex: 1; background: none; border: none; outline: none; color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; line-height: 1.5; resize: none; max-height: 120px; }
+  .input-wrap textarea::placeholder { color: #94a3b8; }
+  .send-btn   { width: 36px; height: 36px; border-radius: 8px; border: none; background: var(--accent); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+  .send-btn:hover:not(:disabled) { background: var(--accent2); }
+  .send-btn:disabled { opacity: .3; cursor: default; }
+  .hint { font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #475569; text-align: right; margin-top: 8px; }
+
+  .spin { animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .disabled-overlay { opacity: .45; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+const API = 'http://localhost:8000';
+
+/* ── Voice Button ─────────────────────────────────── */
+function VoiceButton({ onResult }) {
+  const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const recRef = useRef(null);
+  const transcriptRef = useRef('');
+  const supported = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  function start() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = new SR();
+    recRef.current = r;
+    r.continuous = false;
+    r.interimResults = true;
+    r.lang = 'en-US';
+    r.onstart = () => setListening(true);
+    r.onresult = e => {
+      const t = Array.from(e.results).map(x => x[0].transcript).join('');
+      setTranscript(t);
+      transcriptRef.current = t;
+    };
+    r.onend = () => {
+      setListening(false);
+      if (transcriptRef.current) { onResult(transcriptRef.current); transcriptRef.current = ''; setTranscript(''); }
+    };
+    r.onerror = () => setListening(false);
+    r.start();
+  }
+
+  function stop() { recRef.current?.stop(); }
+
+  if (!supported) return <p style={{fontSize:11,color:'var(--sub)',fontFamily:'IBM Plex Mono'}}>Voice: use Chrome/Edge</p>;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+      <button className={`voice-btn ${listening ? 'listening' : ''}`} onClick={listening ? stop : start}>
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10a7 7 0 01-14 0M12 19v4m-4 0h8"/>
+        </svg>
+        {listening ? 'Listening… click to stop' : 'Click to speak'}
+      </button>
+      {transcript && <p className="voice-transcript">"{transcript}"</p>}
+    </div>
+  );
+}
+
+/* ── Sidebar ──────────────────────────────────────── */
+function Sidebar({ docName, setDocId, setDocName, clearChat, onVoice }) {
+  const [source, setSource] = useState('PDF');
+  const [url, setUrl]       = useState('');
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus]   = useState(null);
+  const [drag, setDrag]       = useState(false);
+  const fileRef = useRef(null);
+
+  async function ingest(file) {
+    if (source !== 'Web URL' && !file) return;
+    if (source === 'Web URL' && !url.trim()) return;
+    setLoading(true); setStatus(null);
+    try {
+      let res;
+      if (source === 'PDF') {
+        const fd = new FormData(); fd.append('file', file);
+        res = await fetch(`${API}/upload/pdf`, { method:'POST', body: fd });
+      } else if (source === 'DOCX') {
+        const fd = new FormData(); fd.append('file', file);
+        res = await fetch(`${API}/upload/docx`, { method:'POST', body: fd });
+      } else {
+        res = await fetch(`${API}/upload/web`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
+      }
+      const data = await res.json();
+      if (res.ok) {
+        setDocId(data.doc_id);
+        setDocName(file ? file.name : url);
+        clearChat();
+        setStatus({ ok: true, msg: `✓ Indexed ${data.chunks} chunks` });
+      } else {
+        setStatus({ ok: false, msg: data.detail || 'Upload failed' });
+      }
+    } catch(e) { setStatus({ ok: false, msg: e.message }); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <aside className="sidebar">
+      {/* Logo */}
+      <div className="logo">
+        <span className="hi">RAG</span><span className="lo"> assistant</span>
+      </div>
+
+      {/* Doc status */}
+      <div className="doc-status">
+        <p className="label">Active Document</p>
+        <div style={{display:'flex',alignItems:'center'}}>
+          <span className="dot" style={{background: docName ? 'var(--ok)' : 'var(--border)'}}/>
+          <span style={{fontSize:12,fontFamily:'IBM Plex Mono',color: docName ? '#cbd5e1' : 'var(--sub)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            {docName || 'No document loaded'}
+          </span>
+        </div>
+      </div>
+
+      {/* Scroll area */}
+      <div className="scroll-area">
+        <p className="label">Load Document</p>
+
+        {/* Source tabs */}
+        <div className="tabs">
+          {['PDF','DOCX','Web URL'].map(s => (
+            <button key={s} className={`tab ${source===s?'active':''}`} onClick={() => { setSource(s); setStatus(null); }}>{s}</button>
+          ))}
+        </div>
+
+        {/* Input */}
+        {source !== 'Web URL' ? (
+          <div
+            className={`dropzone ${drag ? 'drag' : ''}`}
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); ingest(e.dataTransfer.files[0]); }}
+            onClick={() => fileRef.current?.click()}
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 16v-8m0 0-3 3m3-3 3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1"/>
+            </svg>
+            <p>Drop {source} or <a>browse</a></p>
+            <input ref={fileRef} type="file" accept={source==='PDF'?'.pdf':'.docx'} style={{display:'none'}} onChange={e => ingest(e.target.files[0])}/>
+          </div>
+        ) : (
+          <input className="url-input" placeholder="https://example.com" value={url} onChange={e => setUrl(e.target.value)}/>
+        )}
+
+        <button className="btn-primary" disabled={loading} onClick={() => source === 'Web URL' ? ingest(null) : fileRef.current?.click()}>
+          {loading
+            ? <span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                <svg className="spin" width="14" height="14" fill="none" viewBox="0 0 24 24"><circle style={{opacity:.25}} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path style={{opacity:.75}} fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                Processing…
+              </span>
+            : '⚡ Ingest Document'}
+        </button>
+
+        {status && <p className={status.ok ? 'status-ok' : 'status-err'}>{status.msg}</p>}
+
+        <div style={{borderTop:'1px solid var(--border)',paddingTop:16,display:'flex',flexDirection:'column',gap:10}}>
+          <p className="label">Voice Input</p>
+          <VoiceButton onResult={onVoice}/>
+        </div>
+      </div>
+
+      <div className="bottom-bar">
+        <button className="btn-ghost" onClick={clearChat}>Clear Chat</button>
+      </div>
+    </aside>
+  );
+}
+
+/* ── Message Bubble ───────────────────────────────── */
+function Bubble({ msg }) {
+  const u = msg.role === 'user';
+  return (
+    <div className={`row ${u ? 'user' : ''}`}>
+      <div className={`avatar ${u ? 'u' : 'a'}`}>{u ? 'U' : 'AI'}</div>
+      <div className={`bubble ${u ? 'u' : 'a'}`}>
+        {msg.content}
+        {msg.streaming && <span className="cursor"/>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Chat Window ──────────────────────────────────── */
+function ChatWindow({ messages, streaming, docId, onSend, light, setLight }) {
+  const [input, setInput] = useState('');
+  const bottomRef = useRef(null);
+  const taRef     = useRef(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  function send() {
+    if (!input.trim() || streaming) return;
+    onSend(input.trim()); setInput('');
+    if (taRef.current) taRef.current.style.height = 'auto';
+  }
+
+  function onKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+
+  function onInput(e) {
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    setInput(el.value);
+  }
+
+  return (
+    <main className="main">
+      <div className="chat-header" style={{display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+        <div>
+          <h1>Chat</h1>
+          <p>{docId ? 'Document loaded — ask anything' : 'Upload a document to begin'}</p>
+        </div>
+        <button className="theme-toggle" onClick={() => setLight(l => !l)}>
+          {light ? '🌙 Dark' : '☀️ Light'}
+        </button>
+      </div>
+
+      <div className="messages">
+        {messages.length === 0
+          ? <div className="empty">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3z"/></svg>
+              <p>No messages yet</p>
+            </div>
+          : messages.map((m,i) => <Bubble key={i} msg={m}/>)
+        }
+        <div ref={bottomRef}/>
+      </div>
+
+      <div className="input-bar">
+        <div className={`input-wrap ${!docId ? 'disabled-overlay' : ''}`}>
+          <textarea
+            ref={taRef}
+            rows={1}
+            value={input}
+            onChange={onInput}
+            onKeyDown={onKey}
+            placeholder={docId ? 'Ask something about your document…' : 'Upload a document first'}
+          />
+          <button className="send-btn" disabled={!input.trim() || streaming} onClick={send}>
+            {streaming
+              ? <svg className="spin" width="14" height="14" fill="none" viewBox="0 0 24 24"><circle style={{opacity:.25}} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path style={{opacity:.75}} fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              : <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/></svg>
+            }
+          </button>
+        </div>
+        <p className="hint">Enter to send · Shift+Enter for new line</p>
+      </div>
+    </main>
+  );
+}
+
+/* ── App Root ─────────────────────────────────────── */
+function App() {
+  const [messages, setMessages]   = useState([]);
+  const [docId, setDocId]         = useState(null);
+  const [docName, setDocName]     = useState(null);
+  const [streaming, setStreaming] = useState(false);
+  const [light, setLight]         = useState(false);
+
+  // Apply theme class to body
+  useEffect(() => {
+    document.body.classList.toggle('light', light);
+  }, [light]);
+
+  async function sendQuery(query) {
+    if (!docId || !query.trim() || streaming) return;
+
+    setMessages(prev => [...prev, { role:'user', content: query }]);
+    setStreaming(true);
+    setMessages(prev => [...prev, { role:'assistant', content:'', streaming: true }]);
+
+    try {
+      const res = await fetch(`${API}/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, doc_id: docId }),
+      });
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let answer    = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        answer += decoder.decode(value, { stream: true });
+        setMessages(prev => {
+          const u = [...prev];
+          u[u.length-1] = { role:'assistant', content: answer, streaming: true };
+          return u;
+        });
+      }
+      setMessages(prev => {
+        const u = [...prev];
+        u[u.length-1] = { role:'assistant', content: answer, streaming: false };
+        return u;
+      });
+    } catch(e) {
+      setMessages(prev => {
+        const u = [...prev];
+        u[u.length-1] = { role:'assistant', content:`Error: ${e.message}`, streaming: false };
+        return u;
+      });
+    } finally { setStreaming(false); }
+  }
+
+  return (
+    <div className="app">
+      <Sidebar
+        docName={docName}
+        setDocId={setDocId}
+        setDocName={setDocName}
+        clearChat={() => setMessages([])}
+        onVoice={sendQuery}
+      />
+      <ChatWindow
+        messages={messages}
+        streaming={streaming}
+        docId={docId}
+        onSend={sendQuery}
+        light={light}
+        setLight={setLight}
+      />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
