@@ -6,16 +6,16 @@ A **full-stack Retrieval-Augmented Generation (RAG) system** that allows users t
 
 ## 🚀 Live Features
 
-- 1. Upload and process **PDF / DOCX / Web pages**
-- 2. Semantic search using **FAISS vector database**
-- 3. Advanced retrieval with **cross-encoder reranking**
-- 4. Chat with documents using **LLM (Ollama / OpenRouter supported)**
-- 5. Real-time **streaming responses (like ChatGPT)**
-- 6. Persistent chat memory (SQLite-based)
-- 7. Voice-to-text input using Whisper
-- 8. Dark/Light mode UI toggle
-- 9. RESTful FastAPI backend
-- 10. Modular and scalable architecture
+- Upload and process **PDF / DOCX / Web pages**
+- Semantic search using **FAISS vector database**
+- Advanced retrieval with **cross-encoder reranking**
+- Chat with documents using **LLM (Ollama / OpenRouter supported)**
+- Real-time **streaming responses (like ChatGPT)**
+- Persistent chat memory (SQLite-based)
+- Voice-to-text input using Whisper
+- Dark/Light mode UI toggle
+- RESTful FastAPI backend
+- Modular and scalable architecture
 
 ---
 
