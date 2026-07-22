@@ -6,137 +6,214 @@ A **full-stack Retrieval-Augmented Generation (RAG) system** that allows users t
 
 ## 🚀 Live Features
 
-- Upload and process **PDF / DOCX / Web pages**
-- Semantic search using **FAISS vector database**
-- Advanced retrieval with **cross-encoder reranking**
-- Chat with documents using **LLM (Ollama / OpenRouter supported)**
-- Real-time **streaming responses (like ChatGPT)**
-- Persistent chat memory (SQLite-based)
-- Voice-to-text input using Whisper
-- Dark/Light mode UI toggle
+- Upload and process **PDF**, **DOCX**, and **Web URLs**
+- Document parsing using dedicated loaders
+- Recursive text chunking using **RecursiveCharacterTextSplitter**
+- Cross-encoder reranking using **BAAI/bge-reranker-base**
+- Local question answering using **Llama 3.2 (Ollama)**
+- Real-time streaming responses
+- SQLite-based document-specific chat history
+- Backend speech-to-text endpoint using **Faster Whisper**
 - RESTful FastAPI backend
-- Modular and scalable architecture
+- Responsive React frontend with Dark/Light mode
+- Modular project structure
+
 
 ---
 
 ## 🏗️ System Architecture
 
 ```text
-User (Frontend)
-      ↓
-React UI (Chat + Upload + Voice)
-      ↓
-FastAPI Backend
-      ↓
-Document Processing Pipeline
-      ├── Loaders (PDF / DOCX / Web Scraping)
-      ├── Text Chunking
-      ├── Embeddings (HuggingFace)
-      ↓
-FAISS Vector Database
-      ↓
-Retrieval + Reranking
-      ↓
-LLM (Ollama / OpenRouter / API models)
-      ↓
-Streaming Response to UI
-      ↓
-SQLite Memory Store
+                    User
+                      │
+                      ▼
+              React Frontend
+        (Upload • Chat • Voice)
+                      │
+                      ▼
+               FastAPI Backend
+                      │
+                      ▼
+          Document Processing Pipeline
+      ┌─────────────────────────────────┐
+      │ PDF Loader                      │
+      │ DOCX Loader                     │
+      │ Web Page Loader                 │
+      └─────────────────────────────────┘
+                      │
+                      ▼
+      RecursiveCharacterTextSplitter
+                      │
+                      ▼
+      Hugging Face Embedding Model
+                      │
+                      ▼
+          FAISS Vector Store
+                      │
+                      ▼
+      Similarity Search (Top-K)
+                      │
+                      ▼
+ Cross-Encoder Reranker (BGE Reranker)
+                      │
+                      ▼
+        Prompt Construction
+(Context + Chat History + Query)
+                      │
+                      ▼
+         Llama 3.2 (Ollama)
+                      │
+                      ▼
+      Streaming Response to Client
+                      │
+                      ▼
+     SQLite Chat Memory (per document)
 ```
 
 ---
 
-## RAG Pipeline
 
-1. **Document Ingestion**
-   - PDF, DOCX, or web URL loaded into system
+# 🔄 RAG Pipeline
 
-2. **Text Chunking**
-   - RecursiveCharacterTextSplitter used for optimal chunk size
+### 1. Document Ingestion
 
-3. **Embedding Generation**
-   - HuggingFace embedding model (cached for performance)
+Users can upload:
 
-4. **Vector Storage**
-   - FAISS used for fast similarity search
+- PDF
+- DOCX
+- Web URL
 
-5. **Retrieval**
-   - Top-K documents retrieved using semantic similarity
-
-6. **Reranking**
-   - Cross-encoder model improves relevance ranking
-
-7. **LLM Generation**
-   - Context + chat history sent to LLM for answer generation
-
-8. **Memory**
-   - SQLite stores conversation history per document
+Each source is converted into LangChain `Document` objects.
 
 ---
 
-## 🧰 Tech Stack
+### 2. Text Chunking
 
-### Backend
+Documents are split using **RecursiveCharacterTextSplitter** to preserve semantic context while creating manageable chunks for embedding.
 
+---
+
+### 3. Embedding Generation
+
+Each chunk is converted into a dense vector using a Hugging Face embedding model.
+
+The embedding model is cached using `lru_cache()` to avoid loading it repeatedly.
+
+---
+
+### 4. Vector Storage
+
+Chunk embeddings are stored in a document-specific **FAISS vector index**, enabling efficient semantic similarity search.
+
+---
+
+### 5. Retrieval
+
+When the user asks a question:
+
+- The query is embedded.
+- FAISS retrieves the Top-K most semantically similar document chunks.
+
+---
+
+### 6. Cross-Encoder Reranking
+
+Retrieved chunks are reranked using **BAAI/bge-reranker-base** to improve retrieval accuracy before passing context to the LLM.
+
+---
+
+### 7. Answer Generation
+
+A prompt is built containing:
+
+- Retrieved context
+- Previous chat history
+- User query
+
+The prompt is sent to **Llama 3.2 running locally via Ollama**.
+
+Responses are streamed back to the frontend in real time.
+
+---
+
+### 8. Chat Memory
+
+Every interaction is stored in SQLite.
+
+Each uploaded document maintains its own conversation history, allowing follow-up questions within the same document.
+
+---
+
+# 🧰 Tech Stack
+
+## Backend
+
+- Python
 - FastAPI
 - LangChain
 - FAISS
-- HuggingFace Transformers
+- Hugging Face Embeddings
 - SQLite
-- Whisper (speech-to-text)
+- Faster Whisper
+- Ollama
 
-### Frontend
+---
+
+## Frontend
 
 - React (CDN-based)
 - JavaScript (Babel JSX)
-- HTML + CSS (custom design system)
-
-### LLM
-
-- Ollama (Llama3.2)
+- HTML5
+- CSS3
 
 ---
 
-## 📡 API Endpoints
+## LLM
 
-### 📥 Document Upload
-
-| Method | Endpoint       | Description         |
-| ------ | -------------- | ------------------- |
-| POST   | `/upload/pdf`  | Upload PDF document |
-| POST   | `/upload/docx` | Upload DOCX file    |
-| POST   | `/upload/web`  | Ingest web page     |
+- Llama 3.2
 
 ---
 
-### 💬 Chat
+# 📡 API Endpoints
 
-| Method | Endpoint       | Description        |
-| ------ | -------------- | ------------------ |
-| POST   | `/chat`        | Get response       |
-| POST   | `/chat/stream` | Streaming response |
+## Upload
 
----
-
-### 🎤 Voice
-
-| Method | Endpoint | Description                  |
-| ------ | -------- | ---------------------------- |
-| POST   | `/voice` | Speech-to-text transcription |
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| POST | `/upload/pdf` | Upload PDF |
+| POST | `/upload/docx` | Upload DOCX |
+| POST | `/upload/web` | Process web page |
 
 ---
 
-### ❤️ Health Check
+## Chat
 
-```
-GET /health
-```
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| POST | `/chat` | Generate response |
+| POST | `/chat/stream` | Stream response |
 
 ---
 
-## ⚙️ Setup Instructions
+## Voice
 
-### 1. Clone Repository
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| POST | `/voice` | Speech-to-text transcription |
+
+---
+
+## Health
+
+| Method | Endpoint |
+|---------|----------|
+| GET | `/health` |
+
+---
+
+# ⚙️ Setup
+
+## Clone Repository
 
 ```bash
 git clone https://github.com/your-username/rag-ai-assistant.git
@@ -145,13 +222,15 @@ cd rag-ai-assistant
 
 ---
 
-### 2. Backend Setup
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Run server:
+---
+
+## Run Backend
 
 ```bash
 uvicorn app.main:app --reload
@@ -159,9 +238,9 @@ uvicorn app.main:app --reload
 
 ---
 
-### 3. Frontend Setup
+## Run Frontend
 
-Just open:
+Open:
 
 ```
 index.html
@@ -171,29 +250,26 @@ or serve using Live Server.
 
 ---
 
-## 🤖 LLM Configuration
+# ⚙️ Configuration
 
-### Ollama (Local)
+Example environment variables:
 
-```python
+```env
 OLLAMA_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2
+
+EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
+RERANK_MODEL=BAAI/bge-reranker-base
+
+CHUNK_SIZE=500
+CHUNK_OVERLAP=200
+
+RETRIEVAL_TOP_K=8
+RERANK_TOP_N=3
+
+WHISPER_MODEL=base
 ```
-
----
-
-## 💡 Why this project is important
-
-This project demonstrates:
-
-- End-to-end AI system design
-- RAG pipeline implementation
-- Vector database usage
-- LLM integration (local)
-- Backend engineering (FastAPI)
-- Frontend UI/UX design
-- Real-time streaming systems
-
 ---
 
 ## 📸 UI Preview
