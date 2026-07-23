@@ -13,7 +13,7 @@ A **full-stack Retrieval-Augmented Generation (RAG) system** that allows users t
 - Local question answering using **Llama 3.2 (Ollama)**
 - Real-time streaming responses
 - SQLite-based document-specific chat history
-- Backend speech-to-text endpoint using **Faster Whisper**
+- Browser-based speech-to-text using **Web Speech API**
 - RESTful FastAPI backend
 - Responsive React frontend with Dark/Light mode
 - Modular project structure
@@ -154,7 +154,7 @@ Each uploaded document maintains its own conversation history, allowing follow-u
 - FAISS
 - Hugging Face Embeddings
 - SQLite
-- Faster Whisper
+- Web Speech API (Browser)
 - Ollama
 
 ---
@@ -192,14 +192,6 @@ Each uploaded document maintains its own conversation history, allowing follow-u
 |---------|----------|-------------|
 | POST | `/chat` | Generate response |
 | POST | `/chat/stream` | Stream response |
-
----
-
-## Voice
-
-| Method | Endpoint | Description |
-|---------|----------|-------------|
-| POST | `/voice` | Speech-to-text transcription |
 
 ---
 
@@ -268,7 +260,6 @@ CHUNK_OVERLAP=200
 RETRIEVAL_TOP_K=8
 RERANK_TOP_N=3
 
-WHISPER_MODEL_SIZE=base
 ```
 ---
 
