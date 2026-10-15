@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RAG AI Assistant</title>
+<script>
+  // Config: change this (or set it from your deploy step) instead of editing code below.
+  window.APP_CONFIG = { API_URL: 'http://localhost:8000' };
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --base:#08080f; --surface:#0f0f1a; --panel:#13131f; --border:#2a2a40;
+    --accent:#6366f1; --accent2:#4f46e5; --text:#ffffff; --sub:#a0aec0;
+    --muted:#94a3b8; --faint:#64748b; --ok:#4ade80; --err:#f87171;
+  }
+  body.light {
+    --base:#f1f5f9; --surface:#e2e8f0; --panel:#ffffff; --border:#cbd5e1;
+    --text:#0f172a; --sub:#475569; --muted:#475569; --faint:#64748b;
+    --ok:#16a34a; --err:#dc2626;
+  }
+
+  .theme-toggle { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:6px 14px; cursor:pointer; font-size:13px; color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-weight:500; transition:all .2s; white-space:nowrap; }
+  .theme-toggle:hover { border-color:var(--accent); color:var(--accent); }
+
+  html, body, #root { height:100%; background:var(--base); color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:16px; }
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+  .app { display:flex; height:100vh; overflow:hidden; }
+  .sidebar { width:272px; flex-shrink:0; display:flex; flex-direction:column; background:var(--panel); border-right:1px solid var(--border); }
+  .main { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--base); }
+
+  .logo { padding:22px 24px; border-bottom:1px solid var(--border); }
+  .logo span { font-family:'IBM Plex Mono',monospace; font-size:1.4rem; }
+  .logo .hi { color:var(--accent); } .logo .lo { color:var(--sub); }
+  .doc-status { padding:16px 24px; border-bottom:1px solid var(--border); }
+  .label { font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; font-weight:600; }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:8px; flex-shrink:0; }
+  .scroll-area { flex:1; overflow-y:auto; padding:20px 24px; display:flex; flex-direction:column; gap:16px; }
+  .bottom-bar { padding:14px 24px; border-top:1px solid var(--border); }
+
+  .tabs { display:flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+  .tab { flex:1; padding:8px 4px; font-size:13px; font-family:'IBM Plex Mono',monospace; text-align:center; cursor:pointer; background:none; border:none; color:var(--muted); transition:background .15s,color .15s; }
+  .tab.active { background:var(--accent); color:#fff; }
+  .tab:hover:not(.active) { background:var(--surface); color:var(--text); }
+
+  .dropzone { min-height:120px; padding:12px; border:2px dashed var(--border); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:border-color .2s,background .2s; gap:8px; text-align:center; }
+  .dropzone:hover, .dropzone.drag { border-color:var(--accent); background:rgba(99,102,241,.07); }
+  .dropzone.has-file { border-style:solid; border-color:var(--ok); }
+  .dropzone svg { width:32px; height:32px; color:var(--faint); }
+  .dropzone p { font-size:14px; color:var(--muted); word-break:break-all; }
+  .dropzone a { color:var(--accent); }
+
+  .url-input { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 14px; font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--text); outline:none; transition:border-color .2s; }
+  .url-input:focus { border-color:var(--accent); }
+  .url-input::placeholder { color:var(--faint); }
+
+  .btn-primary { width:100%; padding:11px; border-radius:8px; border:none; background:var(--accent); color:#fff; font-size:15px; font-family:'IBM Plex Sans',sans-serif; font-weight:500; cursor:pointer; transition:background .15s; }
+  .btn-primary:hover:not(:disabled) { background:var(--accent2); }
+  .btn-primary:disabled { opacity:.4; cursor:default; }
+  .btn-ghost { width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:none; color:var(--muted); font-size:15px; cursor:pointer; transition:border-color .15s,color .15s; }
+  .btn-ghost:hover { border-color:var(--faint); color:var(--text); }
+
+  .status-ok, .status-err { font-size:13px; font-family:'IBM Plex Mono',monospace; padding:10px 14px; border-radius:8px; }
+  .status-ok { color:var(--ok); background:rgba(74,222,128,.12); }
+  .status-err { color:var(--err); background:rgba(248,113,113,.12); }
+
+  .voice-btn { display:flex; align-items:center; gap:10px; width:100%; padding:11px 14px; border-radius:8px; border:1px solid var(--border); background:none; color:var(--muted); font-size:14px; cursor:pointer; transition:all .15s; }
+  .voice-btn:hover:not(:disabled) { border-color:var(--faint); color:var(--text); }
+  .voice-btn:disabled { opacity:.45; cursor:default; }
+  .voice-btn.listening { border-color:var(--err); color:var(--err); background:rgba(248,113,113,.08); animation:pulse 1.5s ease-in-out infinite; }
+  .voice-note { font-size:12px; font-family:'IBM Plex Mono',monospace; color:var(--muted); }
+  .voice-note.err { color:var(--err); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+  .chat-header { padding:18px 32px; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
+  .chat-header h1 { font-size:18px; font-weight:600; }
+  .chat-header p { font-size:13px; font-family:'IBM Plex Mono',monospace; color:var(--sub); margin-top:3px; }
+
+  .messages { flex:1; overflow-y:auto; padding:28px 32px; display:flex; flex-direction:column; gap:22px; }
+  .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; opacity:.4; }
+  .empty svg { width:52px; height:52px; color:var(--faint); }
+  .empty p { font-size:14px; font-family:'IBM Plex Mono',monospace; color:var(--faint); }
+
+  .row { display:flex; gap:12px; animation:fadeUp .25s ease forwards; }
+  .row.user { flex-direction:row-reverse; }
+  .avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-family:'IBM Plex Mono',monospace; flex-shrink:0; font-weight:600; }
+  .avatar.u { background:var(--accent); color:#fff; }
+  .avatar.a { background:var(--surface); border:1px solid var(--border); color:var(--muted); }
+  .bubble { max-width:70%; padding:13px 18px; border-radius:18px; font-size:15px; line-height:1.65; min-width:0; }
+  .bubble.u { background:var(--accent); color:#fff; border-top-right-radius:4px; white-space:pre-wrap; word-break:break-word; }
+  .bubble.a { background:var(--panel); border:1px solid var(--border); color:var(--text); border-top-left-radius:4px; }
+  .err-note { margin-top:8px; font-size:13px; color:var(--err); font-family:'IBM Plex Mono',monospace; }
+
+  /* Markdown */
+  .md { word-break:break-word; }
+  .md > :last-child { margin-bottom:0; }
+  .md p, .md ul, .md ol, .md pre, .md table, .md blockquote { margin:0 0 .7em; }
+  .md ul, .md ol { padding-left:1.3em; }
+  .md h1, .md h2, .md h3 { font-size:1.05em; margin:.6em 0 .4em; }
+  .md a { color:var(--accent); }
+  .md code { font-family:'IBM Plex Mono',monospace; font-size:.9em; background:var(--surface); padding:1px 5px; border-radius:4px; }
+  .md pre { background:var(--surface); padding:12px; border-radius:8px; overflow-x:auto; }
+  .md pre code { background:none; padding:0; }
+  .md blockquote { border-left:3px solid var(--border); padding-left:12px; color:var(--sub); }
+  .md table { border-collapse:collapse; display:block; overflow-x:auto; }
+  .md th, .md td { border:1px solid var(--border); padding:4px 10px; }
+
+  .cursor { display:inline-block; width:2px; height:1em; background:var(--accent); margin-left:3px; vertical-align:text-bottom; animation:blink .8s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  .input-bar { padding:18px 32px; border-top:1px solid var(--border); flex-shrink:0; }
+  .input-wrap { display:flex; align-items:flex-end; gap:10px; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px 16px; transition:border-color .2s; }
+  .input-wrap:focus-within { border-color:var(--accent2); }
+  .input-wrap textarea { flex:1; background:none; border:none; outline:none; color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:15px; line-height:1.5; resize:none; max-height:120px; }
+  .input-wrap textarea::placeholder { color:var(--muted); }
+  .send-btn { width:36px; height:36px; border-radius:8px; border:none; background:var(--accent); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background .15s; }
+  .send-btn:hover:not(:disabled) { background:var(--accent2); }
+  .send-btn:disabled { opacity:.3; cursor:default; }
+  .hint { font-size:11px; font-family:'IBM Plex Mono',monospace; color:var(--faint); text-align:right; margin-top:8px; }
+
+  .spin { animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .disabled-overlay { opacity:.45; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useMemo } = React;
+
+const API = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || 'http://localhost:8000';
+const STREAM_ERROR_MARKER = '\n[ERROR]';   // backend appends this if generation fails mid-stream
+
+async function errMsg(res) {
+  try { const d = await res.json(); return d.detail || res.statusText || `Error ${res.status}`; }
+  catch { return `Error ${res.status} ${res.statusText}`; }
+}
+
+const Spinner = () => (
+  <svg className="spin" width="14" height="14" fill="none" viewBox="0 0 24 24"><circle style={{opacity:.25}} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path style={{opacity:.75}} fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+);
+
+/* ── Voice Button (records audio, transcribes via backend /voice) ── */
+function VoiceButton({ onResult, disabled }) {
+  const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const recRef = useRef(null);
+  const textRef = useRef('');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  function start() {
+    const r = new SR();
+    recRef.current = r;
+    r.continuous = false;
+    r.interimResults = true;
+    r.lang = 'en-US';
+    r.onstart = () => setListening(true);
+    r.onresult = e => {
+      const t = Array.from(e.results).map(x => x[0].transcript).join('');
+      setTranscript(t); textRef.current = t;
+    };
+    r.onend = () => {
+      setListening(false);
+      if (textRef.current) { onResult(textRef.current); textRef.current = ''; setTranscript(''); }
+    };
+    r.onerror = () => setListening(false);
+    r.start();
+  }
+  function stop() { recRef.current?.stop(); }
+
+  if (!SR) return <p className="voice-note">Voice input: use Chrome or Edge.</p>;
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+      <button className={`voice-btn ${listening ? 'listening' : ''}`} disabled={disabled} onClick={listening ? stop : start}>
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10a7 7 0 01-14 0M12 19v4m-4 0h8"/>
+        </svg>
+        {listening ? 'Listening… click to stop' : 'Click to speak'}
+      </button>
+      {disabled && <p className="voice-note">Load a document first.</p>}
+      {transcript && <p className="voice-note">"{transcript}"</p>}
+    </div>
+  );
+}
+
+
+
+/* ── Sidebar ── */
+function Sidebar({ docName, docId, setDocId, setDocName, clearChat, onVoice }) {
+  const [source, setSource]   = useState('PDF');
+  const [url, setUrl]         = useState('');
+  const [file, setFile]       = useState(null);   // staged file, uploaded on button click
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus]   = useState(null);
+  const [drag, setDrag]       = useState(false);
+  const fileRef = useRef(null);
+  const isUrl = source === 'Web URL';
+  const ext = source === 'PDF' ? '.pdf' : '.docx';
+
+  function pick(f) {
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith(ext)) { setFile(null); setStatus({ ok:false, msg:`Please choose a ${ext} file` }); return; }
+    setFile(f); setStatus(null);
+  }
+
+  async function ingest() {
+    if (isUrl ? !url.trim() : !file) return;
+    setLoading(true); setStatus(null);
+    try {
+      let res;
+      if (isUrl) {
+        res = await fetch(`${API}/upload/web`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: url.trim() }) });
+      } else {
+        const fd = new FormData(); fd.append('file', file);
+        res = await fetch(`${API}/upload/${source === 'PDF' ? 'pdf' : 'docx'}`, { method:'POST', body: fd });
+      }
+      if (!res.ok) throw new Error(await errMsg(res));
+      const data = await res.json();
+      setDocId(data.doc_id);
+      setDocName(isUrl ? url.trim() : file.name);
+      clearChat();
+      setStatus({ ok:true, msg:`✓ Indexed ${data.chunks} chunks` });
+      setFile(null);
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (e) { setStatus({ ok:false, msg: e.message }); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <aside className="sidebar">
+      <div className="logo"><span className="hi">RAG</span><span className="lo"> assistant</span></div>
+
+      <div className="doc-status">
+        <p className="label">Active Document</p>
+        <div style={{display:'flex',alignItems:'center'}}>
+          <span className="dot" style={{background: docName ? 'var(--ok)' : 'var(--border)'}}/>
+          <span style={{fontSize:12,fontFamily:'IBM Plex Mono',color: docName ? 'var(--text)' : 'var(--sub)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            {docName || 'No document loaded'}
+          </span>
+        </div>
+      </div>
+
+      <div className="scroll-area">
+        <p className="label">Load Document</p>
+
+        <div className="tabs">
+          {['PDF','DOCX','Web URL'].map(s => (
+            <button key={s} className={`tab ${source===s?'active':''}`} onClick={() => { setSource(s); setStatus(null); setFile(null); }}>{s}</button>
+          ))}
+        </div>
+
+        {!isUrl ? (
+          <div
+            className={`dropzone ${drag ? 'drag' : ''} ${file ? 'has-file' : ''}`}
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files[0]); }}
+            onClick={() => fileRef.current?.click()}
+          >
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 16v-8m0 0-3 3m3-3 3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1"/>
+            </svg>
+            {file ? <p>{file.name}</p> : <p>Drop {source} or <a>browse</a></p>}
+            <input ref={fileRef} type="file" accept={ext} style={{display:'none'}} onChange={e => pick(e.target.files[0])}/>
+          </div>
+        ) : (
+          <input className="url-input" placeholder="https://example.com" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key==='Enter' && ingest()}/>
+        )}
+
+        <button className="btn-primary" disabled={loading || (isUrl ? !url.trim() : !file)} onClick={ingest}>
+          {loading
+            ? <span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><Spinner/>Processing…</span>
+            : '⚡ Upload Document'}
+        </button>
+
+        {status && <p className={status.ok ? 'status-ok' : 'status-err'}>{status.msg}</p>}
+
+        <div style={{borderTop:'1px solid var(--border)',paddingTop:16,display:'flex',flexDirection:'column',gap:10}}>
+          <p className="label">Voice Input</p>
+          <VoiceButton onResult={onVoice} disabled={!docId}/>
+        </div>
+      </div>
+
+      <div className="bottom-bar"><button className="btn-ghost" onClick={clearChat}>Clear Chat</button></div>
+    </aside>
+  );
+}
+
+/* ── Markdown (marked + DOMPurify) ── */
+function Md({ text }) {
+  const html = useMemo(() => DOMPurify.sanitize(marked.parse(text || '', { breaks: true })), [text]);
+  return <div className="md" dangerouslySetInnerHTML={{ __html: html }}/>;
+}
+
+/* ── Message Bubble ── */
+function Bubble({ msg }) {
+  const u = msg.role === 'user';
+  return (
+    <div className={`row ${u ? 'user' : ''}`}>
+      <div className={`avatar ${u ? 'u' : 'a'}`}>{u ? 'U' : 'AI'}</div>
+      <div className={`bubble ${u ? 'u' : 'a'}`}>
+        {u ? msg.content : (msg.content && <Md text={msg.content}/>)}
+        {msg.streaming && <span className="cursor"/>}
+        {msg.error && <p className="err-note">⚠ {msg.error}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ── Chat Window ── */
+function ChatWindow({ messages, streaming, docId, onSend, light, setLight, input, setInput }) {
+  const bottomRef = useRef(null);
+  const taRef     = useRef(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  // Auto-grow textarea whenever the text changes (typing, voice, or clearing after send)
+  useEffect(() => {
+    const el = taRef.current; if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, [input]);
+
+  function send() {
+    if (!input.trim() || streaming || !docId) return;
+    onSend(input.trim()); setInput('');
+  }
+  function onKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+
+  return (
+    <main className="main">
+      <div className="chat-header">
+        <div>
+          <h1>Chat</h1>
+          <p>{docId ? 'Document loaded — ask anything' : 'Upload a document to begin'}</p>
+        </div>
+        <button className="theme-toggle" onClick={() => setLight(l => !l)}>{light ? '🌙 Dark' : '☀️ Light'}</button>
+      </div>
+
+      <div className="messages">
+        {messages.length === 0
+          ? <div className="empty">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3z"/></svg>
+              <p>No messages yet</p>
+            </div>
+          : messages.map((m,i) => <Bubble key={i} msg={m}/>)}
+        <div ref={bottomRef}/>
+      </div>
+
+      <div className="input-bar">
+        <div className={`input-wrap ${!docId ? 'disabled-overlay' : ''}`}>
+          <textarea ref={taRef} rows={1} value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKey}
+            placeholder={docId ? 'Ask something about your document…' : 'Upload a document first'}/>
+          <button className="send-btn" disabled={!input.trim() || streaming} onClick={send}>
+            {streaming
+              ? <Spinner/>
+              : <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7"/></svg>}
+          </button>
+        </div>
+        <p className="hint">Enter to send · Shift+Enter for new line</p>
+      </div>
+    </main>
+  );
+}
+
+/* ── App Root ── */
+function App() {
+  const [messages, setMessages]   = useState([]);
+  const [docId, setDocId]         = useState(null);
+  const [docName, setDocName]     = useState(null);
+  const [streaming, setStreaming] = useState(false);
+  const [light, setLight]         = useState(false);
+  const [input, setInput]         = useState('');
+
+  useEffect(() => { document.body.classList.toggle('light', light); }, [light]);
+
+  // Voice puts text in the input box so the user can review/edit before sending
+  const onVoice = text => setInput(prev => prev.trim() ? `${prev.trim()} ${text}` : text);
+
+  const patchLast = patch => setMessages(prev => {
+    const u = [...prev]; u[u.length-1] = { ...u[u.length-1], ...patch }; return u;
+  });
+
+  async function sendQuery(query) {
+    if (!docId || !query.trim() || streaming) return;
+    setMessages(prev => [...prev, { role:'user', content: query }, { role:'assistant', content:'', streaming:true }]);
+    setStreaming(true);
+
+    try {
+      const res = await fetch(`${API}/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, doc_id: docId }),
+      });
+      if (!res.ok) throw new Error(await errMsg(res));
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let raw = '', text = '', failed = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        raw += decoder.decode(value, { stream: true });
+        const i = raw.indexOf(STREAM_ERROR_MARKER);
+        failed = i >= 0;
+        text = failed ? raw.slice(0, i) : raw;   // never show the backend error text/trace
+        patchLast({ content: text, streaming: true });
+      }
+      patchLast({
+        content: text, streaming: false,
+        error: failed ? 'The answer was interrupted. Please try again.' : undefined,
+      });
+    } catch (e) {
+      patchLast({ streaming: false, error: e.message });
+    } finally { setStreaming(false); }
+  }
+
+  return (
+    <div className="app">
+      <Sidebar docName={docName} docId={docId} setDocId={setDocId} setDocName={setDocName}
+        clearChat={() => setMessages([])} onVoice={onVoice}/>
+      <ChatWindow messages={messages} streaming={streaming} docId={docId} onSend={sendQuery}
+        light={light} setLight={setLight} input={input} setInput={setInput}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
